@@ -1,11 +1,12 @@
 package com.example.shoppinglist
 
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
-import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
+import androidx.appcompat.app.AppCompatActivity
+
 import android.widget.Toast
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
@@ -15,7 +16,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.PortUnreachableException
+import java.lang.NumberFormatException
+import kotlin.reflect.typeOf
 
 
 class MainActivity : AppCompatActivity() {
@@ -32,6 +34,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
+
+        createItemTouchHelper().attachToRecyclerView(rvProducts)
 
         productRepository = ProductRepository(this)
 
@@ -58,16 +62,15 @@ class MainActivity : AppCompatActivity() {
         val etProductText: String = etProduct.text.toString() // Looks nicer
         val etQuantityText: String = etQuantity.text.toString()
 
-        if (etProductText.isNotBlank() and etQuantityText.isNotBlank()) {  // Check if an integer is provided by user
+        if (etProductText.isNotBlank() and etQuantityText.isNotBlank()) {
             val product = Product(null, etProductText, etQuantityText.toInt())
 
             CoroutineScope(Dispatchers.Main).launch {
                 withContext(Dispatchers.IO) {
                     productRepository.insertProduct(product)
                 }
+                getProductsFromDB()
             }
-
-            getProductsFromDB()
 
         } else Toast.makeText(this, "Please fill out both fields.", Toast.LENGTH_SHORT).show()
     }
@@ -85,16 +88,56 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {  // This one too
+    private fun createItemTouchHelper(): ItemTouchHelper {
+        val callback = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                return false
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.adapterPosition
+                val productToDelete = products[position]
+
+                CoroutineScope(Dispatchers.Main).launch {
+                    withContext(Dispatchers.IO) {
+                        productRepository.deleteProduct(productToDelete)
+                    }
+                    getProductsFromDB()
+                }
+            }
+        }
+        return ItemTouchHelper(callback)
+    }
+
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         return true
     }
 
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {  // This can be removed
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        deleteAllProducts()
+
         return when (item.itemId) {
-            R.id.action_settings -> true
+            R.id.menuDelete -> true
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+
+    private fun deleteAllProducts() {
+        CoroutineScope(Dispatchers.Main).launch {
+            withContext(Dispatchers.IO) {
+                productRepository.deleteAllProducts()
+            }
+            getProductsFromDB()
+
         }
     }
 }

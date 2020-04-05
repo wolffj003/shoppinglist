@@ -5,4 +5,6 @@
     <string name="tilQuantity">What product?</string>
     <string name="tilProduct">What quantity?</string>
 
+    <string name="menuDelete">Delete all products</string>
+
 </resources>
